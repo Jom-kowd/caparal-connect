@@ -2,20 +2,23 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { logAttendance, getInternById, getInterns } from '@/lib/store';
 import { Intern } from '@/lib/types';
-import { ScanLine, Clock, CheckCircle2, Camera, Loader2 } from 'lucide-react';
+import { ScanLine, Clock, CheckCircle2, Camera, Loader2, StopCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { Html5Qrcode } from 'html5-qrcode'; // Import natin ang bagong library
 
 export default function QrScan() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastScan, setLastScan] = useState<{ name: string; action: string; time: string } | null>(null);
   const [manualId, setManualId] = useState('');
   
-  // Mga bagong states para sa Firebase
   const [interns, setInterns] = useState<Intern[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Bagong state para sa Camera
+  const [scannerActive, setScannerActive] = useState(false);
 
   // Oras
   useEffect(() => {
@@ -38,15 +41,54 @@ export default function QrScan() {
     fetchInterns();
   }, []);
 
-  // Ginawang async ang handleScan
+  // Ang function na mag-a-activate at mag-ha-handle ng Camera
+  useEffect(() => {
+    let html5QrCode: Html5Qrcode;
+
+    if (scannerActive) {
+      html5QrCode = new Html5Qrcode("qr-reader");
+      html5QrCode.start(
+        { facingMode: "environment" }, // Mas pinipili ang likod na camera ng phone
+        {
+          fps: 10, // Gaano kabilis mag-scan per second
+          qrbox: { width: 200, height: 200 }, // Box size sa gitna ng camera
+        },
+        async (decodedText) => {
+          // Kapag may na-scan, i-stop muna natin ang camera para hindi mag-spam
+          setScannerActive(false);
+          
+          // Ang format ng QR natin ay: http://website.com/intern/INTERN_ID
+          // Kaya kukunin natin yung huling part pagkatapos ng '/'
+          const urlParts = decodedText.split('/');
+          const scannedId = urlParts[urlParts.length - 1];
+          
+          await handleScan(scannedId);
+        },
+        (errorMessage) => {
+          // Dito napupunta ang error kung walang mabasang QR sa frame (normal lang kaya ignore natin)
+        }
+      ).catch((err) => {
+        toast.error("Failed to start camera. Please check permissions.");
+        setScannerActive(false);
+      });
+    }
+
+    // Cleanup kapag umalis sa page o pinatay ang scanner
+    return () => {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(console.error);
+      }
+    };
+  }, [scannerActive]);
+
   const handleScan = async (internId: string) => {
-    if (isProcessing) return; // Iwas double-scan
+    if (isProcessing) return;
     setIsProcessing(true);
     
     try {
       const intern = await getInternById(internId);
       if (!intern) {
-        toast.error('Intern not found');
+        toast.error('Intern not found / Invalid QR Code');
         return;
       }
       
@@ -71,12 +113,11 @@ export default function QrScan() {
     e.preventDefault();
     if (!manualId || isProcessing) return;
     
-    // Hanapin ang intern sa loaded na listahan
     const intern = interns.find(i => i.id === manualId || i.internId.toUpperCase() === manualId.toUpperCase());
     
     if (intern) {
       await handleScan(intern.id);
-      setManualId(''); // I-clear ang input pagkatapos
+      setManualId('');
     } else {
       toast.error('Intern not found. Please check the ID.');
     }
@@ -104,20 +145,36 @@ export default function QrScan() {
         {/* Scanner area */}
         <div className="glass-card rounded-xl p-8 text-center relative overflow-hidden">
           {isProcessing && (
-            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-20">
               <Loader2 className="animate-spin text-brand-orange" size={40} />
             </div>
           )}
           
-          <div className="w-64 h-64 mx-auto rounded-2xl border-4 border-dashed border-brand-orange/30 flex items-center justify-center bg-muted/20 mb-6">
-            <div className="text-center">
-              <Camera size={48} className="text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Camera scanner coming soon</p>
-              <p className="text-xs text-muted-foreground mt-1">Use manual entry below</p>
-            </div>
+          <div className="w-full max-w-[300px] aspect-square mx-auto rounded-2xl border-4 border-dashed border-brand-orange/30 flex items-center justify-center bg-muted/20 mb-6 overflow-hidden relative">
+            {scannerActive ? (
+              <>
+                <div id="qr-reader" className="w-full h-full object-cover"></div>
+                <Button 
+                  onClick={() => setScannerActive(false)} 
+                  variant="destructive" 
+                  size="icon"
+                  className="absolute top-2 right-2 z-10 rounded-full"
+                >
+                  <StopCircle size={20} />
+                </Button>
+              </>
+            ) : (
+              <div className="text-center p-6">
+                <Camera size={48} className="text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm text-foreground font-medium mb-4">Camera Ready</p>
+                <Button onClick={() => setScannerActive(true)} className="gradient-brand text-primary-foreground">
+                  Start Scanner
+                </Button>
+              </div>
+            )}
           </div>
 
-          <form onSubmit={handleManualSubmit} className="flex gap-2 max-w-sm mx-auto">
+          <form onSubmit={handleManualSubmit} className="flex gap-2 max-w-sm mx-auto mt-6">
             <Input
               value={manualId}
               onChange={e => setManualId(e.target.value)}
@@ -130,8 +187,8 @@ export default function QrScan() {
           </form>
 
           {/* Quick select */}
-          <div className="mt-4">
-            <p className="text-xs text-muted-foreground mb-2">Quick select:</p>
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="text-xs text-muted-foreground mb-2">Manual Quick Select:</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {interns.filter(i => i.status === 'Active').slice(0, 6).map(intern => (
                 <button
