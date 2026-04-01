@@ -1,87 +1,79 @@
 import { Intern, AttendanceRecord } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { db, auth } from './firebase';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 
-const INTERNS_KEY = 'caparal_interns';
-const ATTENDANCE_KEY = 'caparal_attendance';
-const AUTH_KEY = 'caparal_auth';
+// Collection References (Mga "Folders" sa Database)
+const internsRef = collection(db, 'interns');
+const attendanceRef = collection(db, 'attendance');
 
-// Default admin: admin / admin123
-const DEFAULT_ADMIN_HASH = 'admin:admin123';
-
-export function getInterns(): Intern[] {
-  const data = localStorage.getItem(INTERNS_KEY);
-  return data ? JSON.parse(data) : [];
+// --- INTERNS ---
+export async function getInterns(): Promise<Intern[]> {
+  const snapshot = await getDocs(internsRef);
+  return snapshot.docs.map(doc => doc.data() as Intern);
 }
 
-export function saveInterns(interns: Intern[]) {
-  localStorage.setItem(INTERNS_KEY, JSON.stringify(interns));
-}
-
-export function generateInternId(): string {
-  const interns = getInterns();
+export async function generateInternId(): Promise<string> {
+  const interns = await getInterns();
   const num = interns.length + 1;
   return `CAP-${new Date().getFullYear()}-${String(num).padStart(4, '0')}`;
 }
 
-export function addIntern(intern: Omit<Intern, 'id' | 'internId' | 'createdAt'>): Intern {
-  const interns = getInterns();
+export async function addIntern(intern: Omit<Intern, 'id' | 'internId' | 'createdAt'>): Promise<Intern> {
+  const id = uuidv4();
+  const internId = await generateInternId();
   const newIntern: Intern = {
     ...intern,
-    id: uuidv4(),
-    internId: generateInternId(),
+    id,
+    internId,
     createdAt: new Date().toISOString(),
   };
-  interns.push(newIntern);
-  saveInterns(interns);
+  await setDoc(doc(db, 'interns', id), newIntern);
   return newIntern;
 }
 
-export function updateIntern(id: string, updates: Partial<Intern>): Intern | null {
-  const interns = getInterns();
-  const idx = interns.findIndex(i => i.id === id);
-  if (idx === -1) return null;
-  interns[idx] = { ...interns[idx], ...updates };
-  saveInterns(interns);
-  return interns[idx];
+export async function updateIntern(id: string, updates: Partial<Intern>): Promise<Intern | null> {
+  await updateDoc(doc(db, 'interns', id), updates);
+  return await getInternById(id);
 }
 
-export function deleteIntern(id: string) {
-  const interns = getInterns().filter(i => i.id !== id);
-  saveInterns(interns);
+export async function deleteIntern(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'interns', id));
 }
 
-export function getInternById(id: string): Intern | undefined {
-  return getInterns().find(i => i.id === id);
+export async function getInternById(id: string): Promise<Intern | null> {
+  const docSnap = await getDoc(doc(db, 'interns', id));
+  return docSnap.exists() ? (docSnap.data() as Intern) : null;
 }
 
-// Attendance
-export function getAttendance(): AttendanceRecord[] {
-  const data = localStorage.getItem(ATTENDANCE_KEY);
-  return data ? JSON.parse(data) : [];
+// --- ATTENDANCE ---
+export async function getAttendance(): Promise<AttendanceRecord[]> {
+  const snapshot = await getDocs(attendanceRef);
+  return snapshot.docs.map(doc => doc.data() as AttendanceRecord);
 }
 
-export function saveAttendance(records: AttendanceRecord[]) {
-  localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(records));
-}
-
-export function logAttendance(internId: string): { action: 'time_in' | 'time_out'; record: AttendanceRecord } {
-  const records = getAttendance();
+export async function logAttendance(internId: string): Promise<{ action: 'time_in' | 'time_out'; record: AttendanceRecord }> {
   const today = new Date().toISOString().split('T')[0];
   const now = new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  
-  const existing = records.find(r => r.internId === internId && r.date === today);
-  
-  if (existing && !existing.timeOut) {
-    existing.timeOut = now;
-    saveAttendance(records);
-    return { action: 'time_out', record: existing };
+
+  // Hanapin kung may attendance na siya ngayong araw
+  const q = query(attendanceRef, where("internId", "==", internId), where("date", "==", today));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    const existingDoc = snapshot.docs[0];
+    const existingRecord = existingDoc.data() as AttendanceRecord;
+
+    if (!existingRecord.timeOut) {
+      existingRecord.timeOut = now;
+      await updateDoc(doc(db, 'attendance', existingRecord.id), { timeOut: now });
+      return { action: 'time_out', record: existingRecord };
+    }
+    return { action: 'time_out', record: existingRecord };
   }
-  
-  if (existing && existing.timeOut) {
-    // Already completed for today
-    return { action: 'time_out', record: existing };
-  }
-  
+
+  // Time In kung wala pa
   const newRecord: AttendanceRecord = {
     id: uuidv4(),
     internId,
@@ -89,37 +81,46 @@ export function logAttendance(internId: string): { action: 'time_in' | 'time_out
     timeIn: now,
     timeOut: null,
   };
-  records.push(newRecord);
-  saveAttendance(records);
+  await setDoc(doc(db, 'attendance', newRecord.id), newRecord);
   return { action: 'time_in', record: newRecord };
 }
 
-export function getAttendanceForDate(date: string): AttendanceRecord[] {
-  return getAttendance().filter(r => r.date === date);
+export async function getAttendanceForDate(date: string): Promise<AttendanceRecord[]> {
+  const q = query(attendanceRef, where("date", "==", date));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as AttendanceRecord);
 }
 
-export function getAttendanceForIntern(internId: string): AttendanceRecord[] {
-  return getAttendance().filter(r => r.internId === internId);
+export async function getAttendanceForIntern(internId: string): Promise<AttendanceRecord[]> {
+  const q = query(attendanceRef, where("internId", "==", internId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as AttendanceRecord);
 }
 
-// Auth
-export function login(username: string, password: string): boolean {
-  if (`${username}:${password}` === DEFAULT_ADMIN_HASH) {
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ username, token: uuidv4() }));
+// --- AUTHENTICATION ---
+export async function login(username: string, password: string): Promise<boolean> {
+  try {
+    // Kung walang "@", idadagdag natin para maging email format
+    const email = username.includes('@') ? username : `${username}@caparal.com`;
+    await signInWithEmailAndPassword(auth, email, password);
+    localStorage.setItem('caparal_auth', JSON.stringify({ email }));
     return true;
+  } catch (error) {
+    console.error("Login failed:", error);
+    return false;
   }
-  return false;
 }
 
-export function logout() {
-  localStorage.removeItem(AUTH_KEY);
+export async function logout(): Promise<void> {
+  await firebaseSignOut(auth);
+  localStorage.removeItem('caparal_auth');
 }
 
 export function isAuthenticated(): boolean {
-  return !!localStorage.getItem(AUTH_KEY);
+  return !!localStorage.getItem('caparal_auth');
 }
 
 export function getAdmin() {
-  const data = localStorage.getItem(AUTH_KEY);
+  const data = localStorage.getItem('caparal_auth');
   return data ? JSON.parse(data) : null;
 }

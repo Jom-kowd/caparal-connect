@@ -1,16 +1,38 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { getAttendance, getInterns } from '@/lib/store';
+import { Intern, AttendanceRecord } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { CalendarCheck, Download, Search } from 'lucide-react';
+import { CalendarCheck, Download, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AttendancePage() {
-  const attendance = getAttendance();
-  const interns = getInterns();
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [interns, setInterns] = useState<Intern[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [attendanceData, internsData] = await Promise.all([
+          getAttendance(),
+          getInterns()
+        ]);
+        setAttendance(attendanceData);
+        setInterns(internsData);
+      } catch (error) {
+        toast.error("Failed to fetch attendance data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   const filtered = useMemo(() => {
     return attendance
@@ -58,6 +80,17 @@ export default function AttendancePage() {
     a.click();
     toast.success('Attendance exported!');
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <Loader2 className="animate-spin text-brand-orange mb-4" size={48} />
+          <p className="text-muted-foreground">Loading attendance records...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

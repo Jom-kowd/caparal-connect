@@ -9,15 +9,24 @@ import { toast } from 'sonner';
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // Nagdagdag tayo ng loading state
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Ginawa nating async ang function
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(username, password)) {
+    setIsLoading(true);
+    
+    // Nilagyan natin ng await
+    const success = await login(username, password);
+    
+    setIsLoading(false);
+
+    if (success) {
       toast.success('Welcome back, Admin!');
       navigate('/dashboard');
     } else {
-      toast.error('Invalid credentials');
+      toast.error('Invalid credentials. Please try again.');
     }
   };
 
@@ -54,12 +63,13 @@ export default function Login() {
             <p className="text-sm text-muted-foreground mb-6">Sign in to manage interns</p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Username</label>
+                <label className="text-sm font-medium text-foreground mb-1 block">Username / Email</label>
                 <Input
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                  placeholder="admin"
+                  placeholder="admin@caparal.com"
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -70,16 +80,14 @@ export default function Login() {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
+                  disabled={isLoading}
                 />
               </div>
-              <Button type="submit" className="w-full gradient-brand text-primary-foreground hover:opacity-90">
+              <Button type="submit" disabled={isLoading} className="w-full gradient-brand text-primary-foreground hover:opacity-90">
                 <LogIn size={18} className="mr-2" />
-                Sign In
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
-            <p className="text-xs text-muted-foreground text-center mt-4">
-              Default: admin / admin123
-            </p>
           </div>
         </div>
       </div>

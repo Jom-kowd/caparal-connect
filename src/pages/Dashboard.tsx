@@ -1,13 +1,36 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import StatCard from '@/components/StatCard';
 import { getInterns, getAttendanceForDate } from '@/lib/store';
-import { Users, UserCheck, CalendarCheck, Clock } from 'lucide-react';
+import { Intern, AttendanceRecord } from '@/lib/types';
+import { Users, UserCheck, CalendarCheck, Clock, Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
-  const interns = getInterns();
+  const [interns, setInterns] = useState<Intern[]>([]);
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const today = new Date().toISOString().split('T')[0];
-  const todayAttendance = getAttendanceForDate(today);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Sabay nating kukunin ang interns at attendance
+        const [internsData, attendanceData] = await Promise.all([
+          getInterns(),
+          getAttendanceForDate(today)
+        ]);
+        setInterns(internsData);
+        setTodayAttendance(attendanceData);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [today]);
 
   const stats = useMemo(() => ({
     total: interns.length,
@@ -21,6 +44,16 @@ export default function Dashboard() {
       return hour < 9;
     }).length,
   }), [interns, todayAttendance]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <Loader2 className="animate-spin text-brand-orange" size={48} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

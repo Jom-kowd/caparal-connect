@@ -1,16 +1,36 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { getInterns } from '@/lib/store';
+import { Intern } from '@/lib/types';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, UserCircle } from 'lucide-react';
+import { Download, UserCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import html2canvas from 'html2canvas';
 import { toast } from 'sonner';
 
 export default function IdCards() {
-  const interns = getInterns().filter(i => i.status === 'Active');
-  const [selectedId, setSelectedId] = useState<string>(interns[0]?.id || '');
+  const [interns, setInterns] = useState<Intern[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchInterns = async () => {
+      try {
+        const data = await getInterns();
+        const activeInterns = data.filter(i => i.status === 'Active');
+        setInterns(activeInterns);
+        if (activeInterns.length > 0) {
+          setSelectedId(activeInterns[0].id);
+        }
+      } catch (error) {
+        toast.error("Failed to load interns");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchInterns();
+  }, []);
 
   const intern = interns.find(i => i.id === selectedId);
 
@@ -28,6 +48,17 @@ export default function IdCards() {
       toast.error('Failed to download card');
     }
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <Loader2 className="animate-spin text-brand-orange mb-4" size={48} />
+          <p className="text-muted-foreground">Loading ID Cards...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -62,7 +93,7 @@ export default function IdCards() {
           <div className="flex-1 flex justify-center">
             <div
               ref={cardRef}
-              className="w-[360px] rounded-2xl overflow-hidden shadow-2xl border border-border"
+              className="w-[360px] rounded-2xl overflow-hidden shadow-2xl border border-border bg-card"
             >
               {/* Card Header */}
               <div className="gradient-brand-dark px-6 py-5 text-center">
@@ -75,7 +106,7 @@ export default function IdCards() {
               {/* Photo */}
               <div className="bg-card flex justify-center -mb-12 relative z-10 pt-6">
                 {intern.photo ? (
-                  <img src={intern.photo} alt={intern.fullName} className="w-24 h-24 rounded-full object-cover border-4 border-brand-orange shadow-lg" />
+                  <img src={intern.photo} alt={intern.fullName} className="w-24 h-24 rounded-full object-cover border-4 border-brand-orange shadow-lg bg-background" />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-4 border-brand-orange">
                     <UserCircle size={48} className="text-muted-foreground" />
