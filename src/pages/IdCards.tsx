@@ -129,7 +129,7 @@ export default function IdCards() {
                 <div className="absolute bottom-0 left-0 w-full h-1.5" style={{ backgroundColor: '#F97316' }}></div>
                 
                 <h2 className="text-[22px] font-black text-white tracking-tight flex items-center gap-2">
-                  <span style={{ color: '#F97316' }}>Caparal</span> Appliances
+                  <span style={{ color: '#F97316' }}>Caparal</span> Appliances & Furniture
                 </h2>
                 <p className="text-[9px] tracking-[0.2em] text-slate-300 font-semibold uppercase mt-1">
                   Home Style Depot Corp.
