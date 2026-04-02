@@ -1,38 +1,28 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import DashboardLayout from '@/components/DashboardLayout';
-import { getAttendance, getInterns } from '@/lib/store';
-import { Intern, AttendanceRecord } from '@/lib/types';
+import { getAttendance } from '@/lib/attendanceService';
+import { getInterns } from '@/lib/internService';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CalendarCheck, Download, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AttendancePage() {
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [interns, setInterns] = useState<Intern[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [attendanceData, internsData] = await Promise.all([
-          getAttendance(),
-          getInterns()
-        ]);
-        setAttendance(attendanceData);
-        setInterns(internsData);
-      } catch (error) {
-        toast.error("Failed to fetch attendance data");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, []);
+  const { data: attendance = [], isLoading: loadingAtt } = useQuery({
+    queryKey: ['attendance'],
+    queryFn: getAttendance
+  });
+
+  const { data: interns = [], isLoading: loadingInt } = useQuery({
+    queryKey: ['interns'],
+    queryFn: getInterns
+  });
+
+  const isLoading = loadingAtt || loadingInt;
 
   const filtered = useMemo(() => {
     return attendance
@@ -138,9 +128,7 @@ export default function AttendancePage() {
                     <td className="py-3 px-4">{record.timeOut || '—'}</td>
                     <td className="py-3 px-4 font-medium">{calcHours(record.timeIn, record.timeOut)}</td>
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        record.timeOut ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
-                      }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${record.timeOut ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
                         {record.timeOut ? 'Complete' : 'Clocked In'}
                       </span>
                     </td>
@@ -148,10 +136,7 @@ export default function AttendancePage() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">
-                  <CalendarCheck size={32} className="mx-auto mb-2 opacity-40" />
-                  No attendance records found
-                </td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-muted-foreground"><CalendarCheck size={32} className="mx-auto mb-2 opacity-40" />No attendance records found</td></tr>
               )}
             </tbody>
           </table>

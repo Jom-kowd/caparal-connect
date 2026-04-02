@@ -1,37 +1,26 @@
-import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getInternById, getAttendanceForIntern } from '@/lib/store';
-import { Intern, AttendanceRecord } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
+import { getInternById } from '@/lib/internService';
+import { getAttendanceForIntern } from '@/lib/attendanceService';
 import { QRCodeSVG } from 'qrcode.react';
 import { UserCircle, Phone, GraduationCap, Building, Calendar, Loader2 } from 'lucide-react';
 
 export default function InternProfile() {
   const { id } = useParams<{ id: string }>();
-  const [intern, setIntern] = useState<Intern | null>(null);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      try {
-        const [internData, attendanceData] = await Promise.all([
-          getInternById(id),
-          getAttendanceForIntern(id)
-        ]);
-        setIntern(internData);
-        setAttendance(attendanceData);
-      } catch (error) {
-        console.error("Failed to fetch profile", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [id]);
+  const { data: intern, isLoading: loadingIntern } = useQuery({
+    queryKey: ['intern', id],
+    queryFn: () => getInternById(id!),
+    enabled: !!id
+  });
 
-  if (isLoading) {
+  const { data: attendance = [], isLoading: loadingAtt } = useQuery({
+    queryKey: ['attendance', id],
+    queryFn: () => getAttendanceForIntern(id!),
+    enabled: !!id
+  });
+
+  if (loadingIntern || loadingAtt) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <Loader2 className="animate-spin text-brand-orange mb-4" size={48} />
@@ -75,11 +64,7 @@ export default function InternProfile() {
           <div className="text-center px-6 pt-4 pb-2 bg-card/50">
             <h2 className="text-2xl font-display font-bold text-foreground">{intern.fullName}</h2>
             <p className="text-sm text-brand-orange font-medium mt-1">{intern.department}</p>
-            <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
-              intern.status === 'Active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
-            }`}>
-              {intern.status}
-            </span>
+            <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${intern.status === 'Active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{intern.status}</span>
           </div>
 
           <div className="px-6 py-4 space-y-3 bg-card/50">
@@ -117,7 +102,7 @@ export default function InternProfile() {
             <div className="px-6 pb-6 bg-card/50">
               <h3 className="text-sm font-semibold text-foreground mb-2">Recent Attendance</h3>
               <div className="space-y-1">
-                {attendance.slice(-5).reverse().map(a => (
+                {attendance.slice(0, 5).map(a => (
                   <div key={a.id} className="flex justify-between text-xs bg-muted/30 rounded-lg px-3 py-2">
                     <span className="text-muted-foreground">{a.date}</span>
                     <span className="text-foreground">{a.timeIn} — {a.timeOut || 'Pending'}</span>

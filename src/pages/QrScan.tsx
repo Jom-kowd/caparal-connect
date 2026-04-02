@@ -1,89 +1,64 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DashboardLayout from '@/components/DashboardLayout';
-import { logAttendance, getInternById, getInterns } from '@/lib/store';
-import { Intern } from '@/lib/types';
+import { getInterns, getInternById } from '@/lib/internService';
+import { logAttendance } from '@/lib/attendanceService';
 import { ScanLine, Clock, CheckCircle2, Camera, Loader2, StopCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Html5Qrcode } from 'html5-qrcode'; // Import natin ang bagong library
+import { Html5Qrcode } from 'html5-qrcode';
 
 export default function QrScan() {
+  const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastScan, setLastScan] = useState<{ name: string; action: string; time: string } | null>(null);
   const [manualId, setManualId] = useState('');
-  
-  const [interns, setInterns] = useState<Intern[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  // Bagong state para sa Camera
   const [scannerActive, setScannerActive] = useState(false);
 
-  // Oras
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Pagkuha ng mga interns pag-load ng pahina
-  useEffect(() => {
-    const fetchInterns = async () => {
-      try {
-        const data = await getInterns();
-        setInterns(data);
-      } catch (error) {
-        toast.error("Failed to load interns");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchInterns();
-  }, []);
+  const { data: interns = [], isLoading } = useQuery({
+    queryKey: ['interns'],
+    queryFn: getInterns
+  });
 
-  // Ang function na mag-a-activate at mag-ha-handle ng Camera
+  const scanMutation = useMutation({
+    mutationFn: logAttendance,
+    onSuccess: () => {
+      // Pinapa-refresh ang attendance data pag may nag-scan
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    }
+  });
+
   useEffect(() => {
     let html5QrCode: Html5Qrcode;
-
     if (scannerActive) {
       html5QrCode = new Html5Qrcode("qr-reader");
       html5QrCode.start(
-        { facingMode: "environment" }, // Mas pinipili ang likod na camera ng phone
-        {
-          fps: 10, // Gaano kabilis mag-scan per second
-          qrbox: { width: 200, height: 200 }, // Box size sa gitna ng camera
-        },
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 200, height: 200 } },
         async (decodedText) => {
-          // Kapag may na-scan, i-stop muna natin ang camera para hindi mag-spam
           setScannerActive(false);
-          
-          // Ang format ng QR natin ay: http://website.com/intern/INTERN_ID
-          // Kaya kukunin natin yung huling part pagkatapos ng '/'
           const urlParts = decodedText.split('/');
-          const scannedId = urlParts[urlParts.length - 1];
-          
-          await handleScan(scannedId);
+          await handleScan(urlParts[urlParts.length - 1]);
         },
-        (errorMessage) => {
-          // Dito napupunta ang error kung walang mabasang QR sa frame (normal lang kaya ignore natin)
-        }
-      ).catch((err) => {
+        () => {}
+      ).catch(() => {
         toast.error("Failed to start camera. Please check permissions.");
         setScannerActive(false);
       });
     }
-
-    // Cleanup kapag umalis sa page o pinatay ang scanner
     return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(console.error);
-      }
+      if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop().catch(console.error);
     };
   }, [scannerActive]);
 
   const handleScan = async (internId: string) => {
-    if (isProcessing) return;
-    setIsProcessing(true);
+    if (scanMutation.isPending) return;
     
     try {
       const intern = await getInternById(internId);
@@ -92,7 +67,7 @@ export default function QrScan() {
         return;
       }
       
-      const result = await logAttendance(intern.id);
+      const result = await scanMutation.mutateAsync(intern.id);
       const action = result.action === 'time_in' ? 'Timed In' : 'Timed Out';
       
       setLastScan({
@@ -103,23 +78,20 @@ export default function QrScan() {
       
       toast.success(`${intern.fullName} — ${action}`);
     } catch (error) {
-      toast.error('Error logging attendance. Please try again.');
-    } finally {
-      setIsProcessing(false);
+      toast.error('Error logging attendance.');
     }
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualId || isProcessing) return;
+    if (!manualId || scanMutation.isPending) return;
     
     const intern = interns.find(i => i.id === manualId || i.internId.toUpperCase() === manualId.toUpperCase());
-    
     if (intern) {
       await handleScan(intern.id);
       setManualId('');
     } else {
-      toast.error('Intern not found. Please check the ID.');
+      toast.error('Intern not found. Check ID.');
     }
   };
 
@@ -142,9 +114,8 @@ export default function QrScan() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Scanner area */}
         <div className="glass-card rounded-xl p-8 text-center relative overflow-hidden">
-          {isProcessing && (
+          {scanMutation.isPending && (
             <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-20">
               <Loader2 className="animate-spin text-brand-orange" size={40} />
             </div>
@@ -154,73 +125,42 @@ export default function QrScan() {
             {scannerActive ? (
               <>
                 <div id="qr-reader" className="w-full h-full object-cover"></div>
-                <Button 
-                  onClick={() => setScannerActive(false)} 
-                  variant="destructive" 
-                  size="icon"
-                  className="absolute top-2 right-2 z-10 rounded-full"
-                >
-                  <StopCircle size={20} />
-                </Button>
+                <Button onClick={() => setScannerActive(false)} variant="destructive" size="icon" className="absolute top-2 right-2 z-10 rounded-full"><StopCircle size={20} /></Button>
               </>
             ) : (
               <div className="text-center p-6">
                 <Camera size={48} className="text-muted-foreground mx-auto mb-3" />
                 <p className="text-sm text-foreground font-medium mb-4">Camera Ready</p>
-                <Button onClick={() => setScannerActive(true)} className="gradient-brand text-primary-foreground">
-                  Start Scanner
-                </Button>
+                <Button onClick={() => setScannerActive(true)} className="gradient-brand text-primary-foreground">Start Scanner</Button>
               </div>
             )}
           </div>
 
           <form onSubmit={handleManualSubmit} className="flex gap-2 max-w-sm mx-auto mt-6">
-            <Input
-              value={manualId}
-              onChange={e => setManualId(e.target.value)}
-              placeholder="Enter Intern ID (e.g. CAP-2026-0001)"
-              disabled={isProcessing}
-            />
-            <Button type="submit" disabled={isProcessing} className="gradient-brand text-primary-foreground hover:opacity-90 shrink-0">
-              <ScanLine size={16} />
-            </Button>
+            <Input value={manualId} onChange={e => setManualId(e.target.value)} placeholder="Enter Intern ID (e.g. CAP-2026-0001)" disabled={scanMutation.isPending} />
+            <Button type="submit" disabled={scanMutation.isPending} className="gradient-brand text-primary-foreground hover:opacity-90 shrink-0"><ScanLine size={16} /></Button>
           </form>
 
-          {/* Quick select */}
           <div className="mt-6 border-t border-border pt-4">
             <p className="text-xs text-muted-foreground mb-2">Manual Quick Select:</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {interns.filter(i => i.status === 'Active').slice(0, 6).map(intern => (
-                <button
-                  key={intern.id}
-                  onClick={() => handleScan(intern.id)}
-                  disabled={isProcessing}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted hover:bg-brand-orange hover:text-primary-foreground transition-colors disabled:opacity-50"
-                >
+                <button key={intern.id} onClick={() => handleScan(intern.id)} disabled={scanMutation.isPending} className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted hover:bg-brand-orange hover:text-primary-foreground transition-colors disabled:opacity-50">
                   {intern.fullName}
                 </button>
               ))}
-              {interns.length === 0 && (
-                <span className="text-xs text-muted-foreground">No active interns</span>
-              )}
+              {interns.length === 0 && <span className="text-xs text-muted-foreground">No active interns</span>}
             </div>
           </div>
         </div>
 
-        {/* Status panel */}
         <div className="space-y-6">
-          {/* Clock */}
           <div className="glass-card rounded-xl p-8 text-center">
             <Clock size={24} className="text-brand-orange mx-auto mb-2" />
-            <p className="text-4xl font-display font-bold text-foreground">
-              {currentTime.toLocaleTimeString('en-US', { hour12: true })}
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-            </p>
+            <p className="text-4xl font-display font-bold text-foreground">{currentTime.toLocaleTimeString('en-US', { hour12: true })}</p>
+            <p className="text-sm text-muted-foreground mt-1">{currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
           </div>
 
-          {/* Last scan result */}
           {lastScan && (
             <div className="glass-card rounded-xl p-6 border-l-4 border-l-success animate-fade-in">
               <div className="flex items-center gap-3 mb-2">

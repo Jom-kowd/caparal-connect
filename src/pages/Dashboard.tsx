@@ -1,49 +1,55 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import DashboardLayout from '@/components/DashboardLayout';
 import StatCard from '@/components/StatCard';
-import { getInterns, getAttendanceForDate } from '@/lib/store';
-import { Intern, AttendanceRecord } from '@/lib/types';
+import { getInterns } from '@/lib/internService';
+import { getAttendance } from '@/lib/attendanceService';
 import { Users, UserCheck, CalendarCheck, Clock, Loader2 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
-  const [interns, setInterns] = useState<Intern[]>([]);
-  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   const today = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Sabay nating kukunin ang interns at attendance
-        const [internsData, attendanceData] = await Promise.all([
-          getInterns(),
-          getAttendanceForDate(today)
-        ]);
-        setInterns(internsData);
-        setTodayAttendance(attendanceData);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [today]);
+  // ⚡ REACT QUERY: Automatic caching, background sync, at loading states!
+  const { data: interns = [], isLoading: loadingInterns } = useQuery({
+    queryKey: ['interns'],
+    queryFn: getInterns
+  });
 
-  const stats = useMemo(() => ({
-    total: interns.length,
-    active: interns.filter(i => i.status === 'Active').length,
-    presentToday: todayAttendance.length,
-    onTime: todayAttendance.filter(a => {
+  const { data: attendance = [], isLoading: loadingAttendance } = useQuery({
+    queryKey: ['attendance'],
+    queryFn: getAttendance
+  });
+
+  const isLoading = loadingInterns || loadingAttendance;
+
+  // Compute stats
+  const stats = useMemo(() => {
+    const active = interns.filter(i => i.status === 'Active').length;
+    const todayAtt = attendance.filter(a => a.date === today);
+    const onTime = todayAtt.filter(a => {
       if (!a.timeIn) return false;
       const [time, period] = a.timeIn.split(' ');
-      const [h] = time.split(':').map(Number);
+      const h = parseInt(time.split(':')[0]);
       const hour = period === 'PM' && h !== 12 ? h + 12 : period === 'AM' && h === 12 ? 0 : h;
       return hour < 9;
-    }).length,
-  }), [interns, todayAttendance]);
+    }).length;
+
+    return { total: interns.length, active, presentToday: todayAtt.length, onTime, todayAtt };
+  }, [interns, attendance, today]);
+
+  // Generate Data para sa Bar Chart (Last 7 Days)
+  const chartData = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const count = attendance.filter(a => a.date === dateStr).length;
+      days.push({ name: d.toLocaleDateString('en-US', { weekday: 'short' }), present: count });
+    }
+    return days;
+  }, [attendance]);
 
   if (isLoading) {
     return (
@@ -59,7 +65,7 @@ export default function Dashboard() {
     <DashboardLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-display font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Welcome to Caparal Intern Management System</p>
+        <p className="text-muted-foreground mt-1">Caparal Intern Management System Analytics</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -69,48 +75,47 @@ export default function Dashboard() {
         <StatCard title="On Time Today" value={stats.onTime} icon={Clock} />
       </div>
 
-      {/* Recent Attendance */}
-      <div className="glass-card rounded-xl p-6">
-        <h2 className="text-lg font-display font-semibold text-foreground mb-4">Today's Attendance</h2>
-        {todayAttendance.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No attendance records for today.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Intern ID</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Time In</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Time Out</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todayAttendance.map(record => {
-                  const intern = interns.find(i => i.id === record.internId);
-                  return (
-                    <tr key={record.id} className="border-b border-border/50 hover:bg-muted/30">
-                      <td className="py-3 px-4 font-mono text-xs">{intern?.internId}</td>
-                      <td className="py-3 px-4 font-medium">{intern?.fullName || 'Unknown'}</td>
-                      <td className="py-3 px-4">{record.timeIn || '—'}</td>
-                      <td className="py-3 px-4">{record.timeOut || '—'}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          record.timeOut
-                            ? 'bg-success/10 text-success'
-                            : 'bg-warning/10 text-warning'
-                        }`}>
-                          {record.timeOut ? 'Complete' : 'Clocked In'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* CHART SECTION */}
+        <div className="glass-card rounded-xl p-6 lg:col-span-2">
+          <h2 className="text-lg font-display font-semibold text-foreground mb-4">7-Day Attendance Trend</h2>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip cursor={{ fill: 'rgba(249, 115, 22, 0.1)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Bar dataKey="present" fill="#f97316" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        )}
+        </div>
+
+        {/* RECENT ATTENDANCE */}
+        <div className="glass-card rounded-xl p-6">
+          <h2 className="text-lg font-display font-semibold text-foreground mb-4">Today's Logs</h2>
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+            {stats.todayAtt.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No records for today.</p>
+            ) : (
+              stats.todayAtt.map(record => {
+                const intern = interns.find(i => i.id === record.internId);
+                return (
+                  <div key={record.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 border border-border/50">
+                    <div>
+                      <p className="font-medium text-sm">{intern?.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{record.timeIn}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${record.timeOut ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                      {record.timeOut ? 'OUT' : 'IN'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
