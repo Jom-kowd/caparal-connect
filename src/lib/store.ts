@@ -1,24 +1,21 @@
 import { Intern, AttendanceRecord } from './types';
-import { v4 as uuidv4 } from 'uuid';
-import { db, auth } from './firebase';
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
-import { signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
+import { supabase } from './supabase';
 
-// Collection References (Mga "Folders" sa Database)
-const internsRef = collection(db, 'interns');
-const attendanceRef = collection(db, 'attendance');
-
-// --- ⚡ IN-MEMORY CACHE (Ito ang magpapabilis ng sobra sa system) ⚡ ---
+// --- ⚡ IN-MEMORY CACHE (Para instant loading pa rin!) ⚡ ---
 let cachedInterns: Intern[] | null = null;
 let cachedAttendance: AttendanceRecord[] | null = null;
 
 // --- INTERNS ---
 export async function getInterns(): Promise<Intern[]> {
-  // Kung may nakuha na tayong data kanina, ibigay agad! Walang loading!
-  if (cachedInterns) return cachedInterns; 
+  if (cachedInterns) return cachedInterns; // Instant load mula sa cache!
   
-  const snapshot = await getDocs(internsRef);
-  cachedInterns = snapshot.docs.map(doc => doc.data() as Intern);
+  const { data, error } = await supabase.from('interns').select('*').order('createdAt', { ascending: true });
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  
+  cachedInterns = data as Intern[];
   return cachedInterns;
 }
 
@@ -29,58 +26,68 @@ export async function generateInternId(): Promise<string> {
 }
 
 export async function addIntern(intern: Omit<Intern, 'id' | 'internId' | 'createdAt'>): Promise<Intern> {
-  const id = uuidv4();
   const internId = await generateInternId();
-  const newIntern: Intern = {
-    ...intern,
-    id,
-    internId,
-    createdAt: new Date().toISOString(),
-  };
-  await setDoc(doc(db, 'interns', id), newIntern);
   
-  // I-update agad sa cache para updated ang listahan kahit walang loading
-  if (cachedInterns) cachedInterns.push(newIntern);
+  const { data, error } = await supabase
+    .from('interns')
+    .insert([{ ...intern, internId, status: intern.status || 'Active' }])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  
+  const newIntern = data as Intern;
+  if (cachedInterns) cachedInterns.push(newIntern); // Update cache
   return newIntern;
 }
 
 export async function updateIntern(id: string, updates: Partial<Intern>): Promise<Intern | null> {
-  await updateDoc(doc(db, 'interns', id), updates);
+  const { data, error } = await supabase
+    .from('interns')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+    
+  if (error) throw error;
   
-  // I-update ang cache
   if (cachedInterns) {
     const idx = cachedInterns.findIndex(i => i.id === id);
-    if (idx > -1) cachedInterns[idx] = { ...cachedInterns[idx], ...updates };
+    if (idx > -1) cachedInterns[idx] = { ...cachedInterns[idx], ...data };
   }
-  return await getInternById(id);
+  return data as Intern;
 }
 
 export async function deleteIntern(id: string): Promise<void> {
-  await deleteDoc(doc(db, 'interns', id));
+  const { error } = await supabase.from('interns').delete().eq('id', id);
+  if (error) throw error;
   
-  // I-update ang cache
   if (cachedInterns) {
     cachedInterns = cachedInterns.filter(i => i.id !== id);
   }
 }
 
 export async function getInternById(id: string): Promise<Intern | null> {
-  // Check muna sa cache bago mag-request sa internet
   if (cachedInterns) {
     const found = cachedInterns.find(i => i.id === id);
     if (found) return found;
   }
-  const docSnap = await getDoc(doc(db, 'interns', id));
-  return docSnap.exists() ? (docSnap.data() as Intern) : null;
+  const { data, error } = await supabase.from('interns').select('*').eq('id', id).single();
+  if (error) return null;
+  return data as Intern;
 }
 
 // --- ATTENDANCE ---
 export async function getAttendance(): Promise<AttendanceRecord[]> {
-  // Instant load para sa attendance records
   if (cachedAttendance) return cachedAttendance;
   
-  const snapshot = await getDocs(attendanceRef);
-  cachedAttendance = snapshot.docs.map(doc => doc.data() as AttendanceRecord);
+  const { data, error } = await supabase.from('attendance').select('*').order('date', { ascending: false });
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  
+  cachedAttendance = data as AttendanceRecord[];
   return cachedAttendance;
 }
 
@@ -88,78 +95,91 @@ export async function logAttendance(internId: string): Promise<{ action: 'time_i
   const today = new Date().toISOString().split('T')[0];
   const now = new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  const q = query(attendanceRef, where("internId", "==", internId), where("date", "==", today));
-  const snapshot = await getDocs(q);
+  // Hanapin kung may record na siya ngayong araw
+  const { data: existingRecords, error: searchError } = await supabase
+    .from('attendance')
+    .select('*')
+    .eq('internId', internId)
+    .eq('date', today);
 
-  if (!snapshot.empty) {
-    const existingDoc = snapshot.docs[0];
-    const existingRecord = existingDoc.data() as AttendanceRecord;
+  if (searchError) throw searchError;
 
+  if (existingRecords && existingRecords.length > 0) {
+    const existingRecord = existingRecords[0] as AttendanceRecord;
+
+    // Time Out kung hindi pa naka-Time Out
     if (!existingRecord.timeOut) {
-      existingRecord.timeOut = now;
-      await updateDoc(doc(db, 'attendance', existingRecord.id), { timeOut: now });
-      
-      // Update cache
+      const { data: updatedRecord, error: updateError } = await supabase
+        .from('attendance')
+        .update({ timeOut: now })
+        .eq('id', existingRecord.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
       if (cachedAttendance) {
         const index = cachedAttendance.findIndex(a => a.id === existingRecord.id);
-        if (index > -1) cachedAttendance[index].timeOut = now;
+        if (index > -1) cachedAttendance[index] = updatedRecord as AttendanceRecord;
       }
-      return { action: 'time_out', record: existingRecord };
+      return { action: 'time_out', record: updatedRecord as AttendanceRecord };
     }
     return { action: 'time_out', record: existingRecord };
   }
 
-  // Time In kung wala pa
-  const newRecord: AttendanceRecord = {
-    id: uuidv4(),
-    internId,
-    date: today,
-    timeIn: now,
-    timeOut: null,
-  };
-  await setDoc(doc(db, 'attendance', newRecord.id), newRecord);
+  // Time In kung wala pang record
+  const { data: newRecord, error: insertError } = await supabase
+    .from('attendance')
+    .insert([{ internId, date: today, timeIn: now }])
+    .select()
+    .single();
+
+  if (insertError) throw insertError;
+
+  if (cachedAttendance) cachedAttendance.unshift(newRecord as AttendanceRecord);
   
-  // Update cache
-  if (cachedAttendance) cachedAttendance.push(newRecord);
-  
-  return { action: 'time_in', record: newRecord };
+  return { action: 'time_in', record: newRecord as AttendanceRecord };
 }
 
 export async function getAttendanceForDate(date: string): Promise<AttendanceRecord[]> {
-  // Hanapin sa cache imbes na sa internet
   if (cachedAttendance) return cachedAttendance.filter(a => a.date === date);
-  
-  const q = query(attendanceRef, where("date", "==", date));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data() as AttendanceRecord);
+  const { data, error } = await supabase.from('attendance').select('*').eq('date', date);
+  if (error) return [];
+  return data as AttendanceRecord[];
 }
 
 export async function getAttendanceForIntern(internId: string): Promise<AttendanceRecord[]> {
-  // Hanapin sa cache imbes na sa internet
   if (cachedAttendance) return cachedAttendance.filter(a => a.internId === internId);
-  
-  const q = query(attendanceRef, where("internId", "==", internId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data() as AttendanceRecord);
+  const { data, error } = await supabase.from('attendance').select('*').eq('internId', internId);
+  if (error) return [];
+  return data as AttendanceRecord[];
 }
 
 // --- AUTHENTICATION ---
 export async function login(username: string, password: string): Promise<boolean> {
   try {
     const email = username.includes('@') ? username : `${username}@caparal.com`;
-    await signInWithEmailAndPassword(auth, email, password);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+    
+    if (error) {
+      console.error("Login failed:", error.message);
+      return false;
+    }
+    
     localStorage.setItem('caparal_auth', JSON.stringify({ email }));
     return true;
   } catch (error) {
-    console.error("Login failed:", error);
     return false;
   }
 }
 
 export async function logout(): Promise<void> {
-  await firebaseSignOut(auth);
+  await supabase.auth.signOut();
   localStorage.removeItem('caparal_auth');
-  // I-clear ang memory cache kapag nag-logout
+  // I-clear ang cache para secured
   cachedInterns = null;
   cachedAttendance = null;
 }
