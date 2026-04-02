@@ -197,7 +197,7 @@ export default function IdCards() {
                 <div className="p-2 rounded-xl border bg-white shadow-sm" style={{ borderColor: '#e2e8f0' }}>
                   <QRCodeSVG
                     value={`${window.location.origin}/intern/${intern.id}`}
-                    size={75}
+                    size={120}
                     fgColor="#0f172a"
                     bgColor="transparent"
                     level="H"
