@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getInternById } from '@/lib/internService';
 import { getAttendanceForIntern } from '@/lib/attendanceService';
 import { QRCodeSVG } from 'qrcode.react';
-import { UserCircle, Phone, GraduationCap, Building, Calendar, Loader2 } from 'lucide-react';
+import { UserCircle, Phone, GraduationCap, Building, Calendar, Loader2, ShieldCheck, MapPin } from 'lucide-react';
 
 export default function InternProfile() {
   const { id } = useParams<{ id: string }>();
@@ -22,95 +22,146 @@ export default function InternProfile() {
 
   if (loadingIntern || loadingAtt) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
         <Loader2 className="animate-spin text-brand-orange mb-4" size={48} />
-        <p className="text-muted-foreground">Loading Intern Profile...</p>
+        <p className="text-slate-500 font-medium tracking-wide animate-pulse">Loading Digital Profile...</p>
       </div>
     );
   }
 
   if (!intern) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-display font-bold text-foreground">Intern Not Found</h1>
-          <p className="text-muted-foreground mt-2">This intern profile does not exist.</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-center bg-white p-8 rounded-3xl shadow-xl">
+          <ShieldCheck size={48} className="mx-auto text-slate-300 mb-4" />
+          <h1 className="text-2xl font-display font-bold text-slate-800">Intern Not Found</h1>
+          <p className="text-slate-500 mt-2 text-sm">The digital profile you scanned does not exist or has been removed.</p>
         </div>
       </div>
     );
   }
 
+  const isActive = intern.status === 'Active';
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="gradient-brand-dark py-8 px-4 text-center">
-        <p className="text-xs tracking-widest uppercase text-sidebar-foreground/50">Our Great Home Style Depot Corp.</p>
-        <h1 className="text-xl font-display font-bold text-primary-foreground mt-1">
-          <span className="text-brand-orange">Caparal</span> Appliances & Furniture
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-12">
+      {/* Header Banner */}
+      <div className="bg-slate-900 pt-10 pb-20 px-4 text-center relative overflow-hidden">
+        <div className="absolute bottom-0 left-0 w-full h-1.5 bg-brand-orange"></div>
+        <p className="text-[10px] tracking-[0.2em] uppercase text-slate-400 font-bold mb-1">Official Digital ID</p>
+        <h1 className="text-2xl font-display font-black text-white tracking-tight">
+          <span className="text-brand-orange">Caparal</span> Appliances
         </h1>
       </div>
 
-      <div className="max-w-lg mx-auto -mt-8 px-4 pb-8">
-        <div className="glass-card rounded-2xl overflow-hidden shadow-xl border border-border/50">
-          <div className="flex justify-center pt-6 bg-card/50">
-            {intern.photo ? (
-              <img src={intern.photo} alt={intern.fullName} className="w-28 h-28 rounded-full object-cover border-4 border-brand-orange shadow-lg bg-background" />
-            ) : (
-              <div className="w-28 h-28 rounded-full bg-muted flex items-center justify-center border-4 border-brand-orange">
-                <UserCircle size={56} className="text-muted-foreground" />
+      {/* Main Card */}
+      <div className="max-w-md mx-auto -mt-12 px-4 relative z-10">
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800">
+          
+          {/* Profile Photo */}
+          <div className="flex justify-center pt-8 bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50">
+            <div className="relative">
+              <div className="absolute inset-0 bg-brand-orange rounded-full blur-md opacity-20"></div>
+              {intern.photo ? (
+                <img src={intern.photo} alt={intern.fullName} className="relative w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg bg-slate-100" />
+              ) : (
+                <div className="relative w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center border-4 border-white shadow-lg">
+                  <UserCircle size={64} className="text-slate-300" />
+                </div>
+              )}
+              {/* Status Badge Over Photo */}
+              <div className="absolute -bottom-2 -right-2">
+                 <div className={`p-1.5 rounded-full border-2 border-white shadow-sm ${isActive ? 'bg-success' : 'bg-slate-400'}`}>
+                   <ShieldCheck size={16} className="text-white" />
+                 </div>
               </div>
-            )}
-          </div>
-
-          <div className="text-center px-6 pt-4 pb-2 bg-card/50">
-            <h2 className="text-2xl font-display font-bold text-foreground">{intern.fullName}</h2>
-            <p className="text-sm text-brand-orange font-medium mt-1">{intern.department}</p>
-            <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${intern.status === 'Active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{intern.status}</span>
-          </div>
-
-          <div className="px-6 py-4 space-y-3 bg-card/50">
-            <div className="flex items-center gap-3 text-sm">
-              <GraduationCap size={16} className="text-muted-foreground" />
-              <span className="text-foreground">{intern.course} — {intern.school}</span>
             </div>
+          </div>
+
+          {/* Identity Section */}
+          <div className="text-center px-6 pt-5 pb-6 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+            <h2 className="text-2xl font-display font-black text-slate-900 dark:text-white uppercase tracking-tight leading-none mb-2">
+              {intern.fullName}
+            </h2>
+            <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-brand-orange/10 border border-brand-orange/20 mb-3">
+               <span className="text-[11px] font-black uppercase tracking-widest text-brand-orange">
+                 {intern.department}
+               </span>
+            </div>
+            <div>
+              <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase ${
+                isActive ? 'bg-success/15 text-success border border-success/20' : 'bg-slate-200 text-slate-500 border border-slate-300'
+              }`}>
+                {isActive ? 'Authorized Intern' : 'Inactive / Cleared'}
+              </span>
+            </div>
+          </div>
+
+          {/* Details Section */}
+          <div className="px-8 py-6 space-y-4 bg-white dark:bg-slate-900">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-slate-50 rounded-lg"><GraduationCap size={18} className="text-slate-400" /></div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Education</p>
+                <p className="text-sm font-semibold text-slate-700 leading-tight">{intern.course}</p>
+                <p className="text-xs text-slate-500">{intern.school}</p>
+              </div>
+            </div>
+
             {intern.contactNumber && (
-              <div className="flex items-center gap-3 text-sm">
-                <Phone size={16} className="text-muted-foreground" />
-                <span className="text-foreground">{intern.contactNumber}</span>
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-slate-50 rounded-lg"><Phone size={18} className="text-slate-400" /></div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Contact</p>
+                  <p className="text-sm font-semibold text-slate-700">{intern.contactNumber}</p>
+                </div>
               </div>
             )}
-            <div className="flex items-center gap-3 text-sm">
-              <Building size={16} className="text-muted-foreground" />
-              <span className="text-foreground">{intern.department}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Calendar size={16} className="text-muted-foreground" />
-              <span className="text-foreground">{intern.startDate} → {intern.endDate}</span>
-            </div>
-          </div>
 
-          <div className="px-6 py-4 flex justify-center border-t border-border bg-card/50">
-            <div className="p-3 bg-primary-foreground rounded-xl border border-border">
-              <QRCodeSVG value={`${window.location.origin}/intern/${intern.id}`} size={100} fgColor="hsl(0,0%,6%)" bgColor="transparent" />
+            <div className="flex items-center gap-4">
+              <div className="p-2 bg-slate-50 rounded-lg"><Calendar size={18} className="text-slate-400" /></div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">OJT Duration</p>
+                <p className="text-sm font-semibold text-slate-700">{intern.startDate} to {intern.endDate}</p>
+              </div>
             </div>
           </div>
 
-          <div className="px-6 pb-4 text-center bg-card/50">
-            <p className="font-mono text-xs text-muted-foreground">{intern.internId}</p>
+          {/* QR Code Section */}
+          <div className="px-6 py-8 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/30 border-y border-slate-100 dark:border-slate-800">
+            <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-200">
+              <QRCodeSVG value={`${window.location.origin}/intern/${intern.id}`} size={120} fgColor="#0f172a" bgColor="transparent" />
+            </div>
+            <p className="font-mono text-sm font-bold text-slate-500 tracking-widest mt-4">
+              {intern.internId}
+            </p>
+            <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-1">Scan for Attendance</p>
           </div>
 
+          {/* Attendance History */}
           {attendance.length > 0 && (
-            <div className="px-6 pb-6 bg-card/50">
-              <h3 className="text-sm font-semibold text-foreground mb-2">Recent Attendance</h3>
-              <div className="space-y-1">
-                {attendance.slice(0, 5).map(a => (
-                  <div key={a.id} className="flex justify-between text-xs bg-muted/30 rounded-lg px-3 py-2">
-                    <span className="text-muted-foreground">{a.date}</span>
-                    <span className="text-foreground">{a.timeIn} — {a.timeOut || 'Pending'}</span>
+            <div className="px-6 py-6 bg-white dark:bg-slate-900">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Recent Logs</h3>
+              <div className="space-y-2">
+                {attendance.slice(0, 3).map(a => (
+                  <div key={a.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-100">
+                    <span className="text-xs font-semibold text-slate-600">{a.date}</span>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-slate-800">{a.timeIn}</p>
+                      <p className="text-[10px] text-slate-500 font-medium">{a.timeOut ? `Out: ${a.timeOut}` : 'Currently Clocked In'}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          
+          {/* Footer Info */}
+          <div className="px-6 py-4 bg-slate-900 text-center flex items-center justify-center gap-2">
+             <MapPin size={12} className="text-slate-400" />
+             <p className="text-[9px] text-slate-400 font-medium tracking-wide">Brgy. Fundado, Labo, Camarines Norte</p>
+          </div>
+
         </div>
       </div>
     </div>
