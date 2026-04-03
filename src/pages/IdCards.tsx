@@ -16,7 +16,6 @@ export default function IdCards() {
   
   const captureRef = useRef<HTMLDivElement>(null);
 
-  // ⚡ REACT QUERY WITH EXPLICIT TYPE CASTING
   const { data, isLoading } = useQuery({
     queryKey: ['interns'],
     queryFn: async () => {
@@ -26,10 +25,8 @@ export default function IdCards() {
     }
   });
 
-  // Pilitin natin ang TypeScript na basahin ito bilang Intern[] para walang error sa .map()
   const interns = (data || []) as Intern[];
 
-  // Set default selected ID kapag nag-load ang data
   useEffect(() => {
     if (interns.length > 0 && !selectedId) {
       setSelectedId(interns[0].id);
@@ -38,14 +35,12 @@ export default function IdCards() {
 
   const intern = interns.find(i => i.id === selectedId);
 
-  // ⚡ SAFE PRINTING EFFECT
-  // Naghihintay ito na ma-drawing muna ang mga ID sa screen bago buksan ang Print Dialog
   useEffect(() => {
     if (printMode !== null) {
       const timer = setTimeout(() => {
         window.print();
-        setPrintMode(null); // I-reset pagkatapos mag-print
-      }, 500); // 500ms delay para sure na render na ang lahat ng IDs
+        setPrintMode(null);
+      }, 500); 
       
       return () => clearTimeout(timer);
     }
@@ -54,7 +49,6 @@ export default function IdCards() {
   const handlePrintSingle = () => setPrintMode('single');
   const handlePrintBatch = () => setPrintMode('batch');
 
-  // DOWNLOAD FUNCTION
   const downloadCard = async () => {
     if (!captureRef.current) return;
     setIsDownloading(true);
@@ -83,7 +77,6 @@ export default function IdCards() {
     );
   }
 
-  // --- COMPONENT: FRONT ID CARD ---
   const FrontIDCard = ({ data }: { data: Intern }) => (
     <div className="w-[340px] h-[540px] bg-white rounded-[16px] overflow-hidden shadow-xl relative flex flex-col border border-slate-200 print:shadow-none print:break-inside-avoid print:border-slate-300" style={{ backgroundColor: '#ffffff', isolation: 'isolate' }}>
       <div className="w-full h-[145px] flex flex-col items-center justify-start pt-7 relative z-0" style={{ backgroundColor: '#0f172a' }}>
@@ -125,7 +118,6 @@ export default function IdCards() {
     </div>
   );
 
-  // --- COMPONENT: BACK ID CARD ---
   const BackIDCard = ({ data }: { data: Intern }) => (
     <div className="w-[340px] h-[540px] bg-white rounded-[16px] overflow-hidden shadow-xl relative flex flex-col border border-slate-200 print:shadow-none print:break-inside-avoid print:border-slate-300" style={{ backgroundColor: '#ffffff', isolation: 'isolate' }}>
       <div className="w-full py-4 flex flex-col items-center justify-center relative z-0" style={{ backgroundColor: '#0f172a' }}>
@@ -149,7 +141,8 @@ export default function IdCards() {
         </p>
         <div className="w-12 h-[1px] bg-slate-300 mx-auto mb-4"></div>
         <p className="text-[9px] font-bold text-slate-800 uppercase mb-1">If found, please return to:</p>
-        <p className="text-[9px] text-slate-500 font-medium">CAPARAL & FURNITURE OFFICE</p>
+        {/* BINAGO DITO */}
+        <p className="text-[9px] text-slate-500 font-medium">OFFICE OF ADMIN ON CAPARAL</p>
       </div>
       <div className="h-2 w-full absolute bottom-0 left-0" style={{ backgroundColor: '#F97316' }}></div>
     </div>
@@ -204,9 +197,7 @@ export default function IdCards() {
         )}
       </div>
 
-      {/* ⚡ HIDDEN PRINT LAYOUT ⚡ */}
       <div className="hidden print:flex print:flex-col print:gap-8">
-        
         {printMode === 'single' && intern && (
           <div className="flex flex-row gap-8 scale-[0.7] transform-gpu origin-top-left">
             <FrontIDCard data={intern} />
@@ -220,7 +211,6 @@ export default function IdCards() {
             <BackIDCard data={i} />
           </div>
         ))}
-        
       </div>
     </DashboardLayout>
   );

@@ -121,7 +121,8 @@ export default function EmployeeIdCards() {
         <p className="text-[9px] text-slate-500 leading-relaxed font-medium mb-4">This identification card is the property of <span className="font-bold text-slate-700">Caparal Appliances & Furniture</span>. It is non-transferable and must be worn at all times while inside the premises.</p>
         <div className="w-12 h-[1px] bg-slate-300 mx-auto mb-4"></div>
         <p className="text-[9px] font-bold text-slate-800 uppercase mb-1">If found, please return to:</p>
-        <p className="text-[9px] text-slate-500 font-medium">Brgy. Fundado, Labo, Camarines Norte</p>
+        {/* BINAGO DITO */}
+        <p className="text-[9px] text-slate-500 font-medium">OFFICE OF ADMIN ON CAPARAL</p>
       </div>
       <div className="h-2 w-full absolute bottom-0 left-0" style={{ backgroundColor: '#F97316' }}></div>
     </div>
