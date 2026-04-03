@@ -6,8 +6,9 @@ import { getInterns, addIntern, updateIntern, deleteIntern } from '@/lib/internS
 import { Intern } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Pencil, Trash2, Download, UserCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Download, UserCircle, Loader2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 export default function InternsPage() {
   const queryClient = useQueryClient();
@@ -164,9 +165,12 @@ export default function InternsPage() {
                     </td>
                     <td className="py-3 px-6">
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => setEditingIntern(intern)} title="Edit Intern" className="p-2 rounded-lg bg-slate-50 hover:bg-brand-orange/10 text-slate-500 hover:text-brand-orange transition-colors"><Pencil size={16} /></button>
-                        <button onClick={() => handleDelete(intern.id)} title="Delete Intern" className="p-2 rounded-lg bg-slate-50 hover:bg-destructive/10 text-slate-500 hover:text-destructive transition-colors"><Trash2 size={16} /></button>
-                      </div>
+  <Link to={`/admin/intern/${intern.id}`} title="View Profile" className="p-2 rounded-lg bg-slate-50 hover:bg-blue-500/10 text-slate-500 hover:text-blue-600 transition-colors">
+    <Eye size={16} />
+  </Link>
+  <button onClick={() => setEditingIntern(intern)} title="Edit Intern" className="p-2 rounded-lg bg-slate-50 hover:bg-brand-orange/10 text-slate-500 hover:text-brand-orange transition-colors"><Pencil size={16} /></button>
+  <button onClick={() => handleDelete(intern.id)} title="Delete Intern" className="p-2 rounded-lg bg-slate-50 hover:bg-destructive/10 text-slate-500 hover:text-destructive transition-colors"><Trash2 size={16} /></button>
+</div>
                     </td>
                   </tr>
                 ))

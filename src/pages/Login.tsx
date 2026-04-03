@@ -43,12 +43,12 @@ export default function Login() {
           </h1>
           <div className="space-y-4">
             <p className="text-lg text-slate-300 font-medium">
-              Intern Management & Attendance System
-            </p>
-            <div className="h-px w-12 bg-brand-orange/50 mx-auto"></div>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Streamlining intern tracking, QR-based attendance logs, and PVC ID generation for Our Home Style Depot Corp.
-            </p>
+            Human Resource Information System (HRIS)
+          </p>
+          <div className="h-px w-12 bg-brand-orange/50 mx-auto"></div>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            Streamlining workforce tracking, QR-based attendance logs, and PVC ID generation for Our Home Style Depot Corp.
+          </p>
           </div>
         </div>
 

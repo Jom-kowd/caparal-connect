@@ -20,6 +20,9 @@ import EmployeeIdCards from "./pages/EmployeeIdCards";
 import NotFound from "./pages/NotFound";
 import EmployeeProfile from "./pages/EmployeeProfile";
 
+import AdminInternProfile from "./pages/AdminInternProfile";
+import AdminEmployeeProfile from "./pages/AdminEmployeeProfile";
+
 const queryClient = new QueryClient();
 
 // Protected Route Component (Para sa mga Admin pages)
@@ -61,6 +64,10 @@ const App = () => (
           
           {/* Catch-all (404 Page Not Found) */}
           <Route path="*" element={<NotFound />} />
+
+          {/* Admin Profile Views */}
+          <Route path="/admin/intern/:id" element={<ProtectedRoute><AdminInternProfile /></ProtectedRoute>} />
+          <Route path="/admin/employee/:id" element={<ProtectedRoute><AdminEmployeeProfile /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

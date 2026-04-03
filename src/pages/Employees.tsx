@@ -6,8 +6,9 @@ import { getEmployees, addEmployee, updateEmployee, deleteEmployee } from '@/lib
 import { Employee } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Pencil, Trash2, Download, UserCircle, Loader2, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Download, UserCircle, Loader2, ChevronLeft, ChevronRight, Briefcase, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
@@ -149,9 +150,12 @@ export default function EmployeesPage() {
                     </td>
                     <td className="py-3 px-6">
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => setEditingEmployee(emp)} title="Edit" className="p-2 rounded-lg hover:bg-brand-orange/10 text-slate-500 hover:text-brand-orange transition-colors"><Pencil size={16} /></button>
-                        <button onClick={() => handleDelete(emp.id)} title="Delete" className="p-2 rounded-lg hover:bg-destructive/10 text-slate-500 hover:text-destructive transition-colors"><Trash2 size={16} /></button>
-                      </div>
+  <Link to={`/admin/employee/${emp.id}`} title="View Profile" className="p-2 rounded-lg hover:bg-blue-500/10 text-slate-500 hover:text-blue-600 transition-colors">
+    <Eye size={16} />
+  </Link>
+  <button onClick={() => setEditingEmployee(emp)} title="Edit" className="p-2 rounded-lg hover:bg-brand-orange/10 text-slate-500 hover:text-brand-orange transition-colors"><Pencil size={16} /></button>
+  <button onClick={() => handleDelete(emp.id)} title="Delete" className="p-2 rounded-lg hover:bg-destructive/10 text-slate-500 hover:text-destructive transition-colors"><Trash2 size={16} /></button>
+</div>
                     </td>
                   </tr>
                 ))
