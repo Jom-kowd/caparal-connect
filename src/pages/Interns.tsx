@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Plus, Search, Pencil, Trash2, Download, UserCircle, Loader2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { getUser } from '@/lib/authService';
 
 export default function InternsPage() {
   const queryClient = useQueryClient();
@@ -16,6 +17,8 @@ export default function InternsPage() {
   const [editingIntern, setEditingIntern] = useState<Intern | null>(null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'Active' | 'Inactive'>('all');
+  const currentUser = getUser();
+  const isAdmin = currentUser?.role === 'Admin';
 
   // ⚡ PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);

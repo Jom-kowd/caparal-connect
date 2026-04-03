@@ -23,6 +23,7 @@ import EmployeeProfile from "./pages/EmployeeProfile";
 import AdminInternProfile from "./pages/AdminInternProfile";
 import AdminEmployeeProfile from "./pages/AdminEmployeeProfile";
 
+import AdminProfile from "./pages/AdminProfile";
 const queryClient = new QueryClient();
 
 // Protected Route Component (Para sa mga Admin pages)
@@ -68,6 +69,7 @@ const App = () => (
           {/* Admin Profile Views */}
           <Route path="/admin/intern/:id" element={<ProtectedRoute><AdminInternProfile /></ProtectedRoute>} />
           <Route path="/admin/employee/:id" element={<ProtectedRoute><AdminEmployeeProfile /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><AdminProfile /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
