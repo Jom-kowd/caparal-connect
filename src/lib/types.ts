@@ -1,15 +1,16 @@
+// --- INTERN TYPES ---
 export interface Intern {
   id: string;
   internId: string;
   fullName: string;
-  photo: string;
-  school: string;
   course: string;
-  contactNumber: string;
+  school: string;
   department: string;
   startDate: string;
   endDate: string;
-  status: 'Active' | 'Inactive';
+  contactNumber?: string;
+  status: 'Active' | 'Inactive' | 'Completed';
+  photo?: string;
   createdAt: string;
 }
 
@@ -17,11 +18,26 @@ export interface AttendanceRecord {
   id: string;
   internId: string;
   date: string;
-  timeIn: string | null;
+  timeIn: string;
   timeOut: string | null;
 }
 
-export interface Admin {
-  username: string;
-  token: string;
+// --- EMPLOYEE TYPES (BAGONG DAGDAG) ---
+export interface Employee {
+  id: string;
+  employeeId: string;
+  fullName: string;
+  position: string;
+  department: string;
+  status: 'Active' | 'Inactive' | 'On Leave';
+  photo?: string;
+  createdAt: string;
+}
+
+export interface EmployeeAttendanceRecord {
+  id: string;
+  employeeId: string;
+  date: string;
+  timeIn: string;
+  timeOut: string | null;
 }
