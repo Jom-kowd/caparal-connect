@@ -8,6 +8,38 @@ import { Button } from '@/components/ui/button';
 import { CalendarCheck, Download, Search, Loader2, ChevronLeft, ChevronRight, X, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 
+// ⚡ 8 AM to 6 PM LATE CHECKER LOGIC ⚡
+const checkScheduleStatus = (timeIn: string | null, timeOut: string | null) => {
+  if (!timeIn) return null;
+  let isLate = false;
+  let isEarlyOut = false;
+
+  try {
+    const parseMins = (t: string) => {
+      const [time, period] = t.split(' ');
+      let [h, m] = time.split(':').map(Number);
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    const inMins = parseMins(timeIn);
+    if (inMins > (8 * 60)) isLate = true; // Late kapag lagpas 8:00 AM
+
+    if (timeOut) {
+      const outMins = parseMins(timeOut);
+      if (outMins < (18 * 60)) isEarlyOut = true; // Early out kapag bago mag 6:00 PM (18:00)
+    }
+
+    if (isLate && isEarlyOut) return { text: "Late & Early Out", color: "text-destructive bg-destructive/10" };
+    if (isLate) return { text: "Late", color: "text-warning bg-warning/10" };
+    if (isEarlyOut) return { text: "Early Out", color: "text-orange-500 bg-orange-500/10" };
+    return { text: "On Time", color: "text-success bg-success/10" };
+  } catch (e) {
+    return null;
+  }
+};
+
 export default function EmployeeAttendancePage() {
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [search, setSearch] = useState('');
@@ -21,14 +53,12 @@ export default function EmployeeAttendancePage() {
   useEffect(() => { setCurrentPage(1); }, [search, dateFilter]);
 
   const filtered = useMemo(() => {
-    return attendance
-      .filter(r => {
+    return attendance.filter(r => {
         const matchesDate = !dateFilter || r.date === dateFilter;
         const emp = employees.find(e => e.id === r.employeeId);
         const matchesSearch = !search || emp?.fullName.toLowerCase().includes(search.toLowerCase()) || emp?.employeeId.toLowerCase().includes(search.toLowerCase());
         return matchesDate && matchesSearch;
-      })
-      .sort((a, b) => b.date.localeCompare(a.date));
+      }).sort((a, b) => b.date.localeCompare(a.date));
   }, [attendance, dateFilter, search, employees]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
@@ -51,21 +81,6 @@ export default function EmployeeAttendancePage() {
     } catch { return '—'; }
   };
 
-  const exportCSV = () => {
-    const headers = 'Date,Employee ID,Name,Time In,Time Out,Hours\n';
-    const rows = filtered.map(r => {
-      const emp = employees.find(e => e.id === r.employeeId);
-      return `${r.date},${emp?.employeeId},${emp?.fullName},${r.timeIn || ''},${r.timeOut || ''},${calcHours(r.timeIn, r.timeOut)}`;
-    }).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `employee-attendance-${dateFilter || 'all-time'}.csv`;
-    a.click();
-    toast.success(`Exported ${filtered.length} records!`);
-  };
-
   if (isLoading) return <DashboardLayout><div className="flex justify-center h-[60vh] items-center"><Loader2 className="animate-spin text-brand-orange" size={48} /></div></DashboardLayout>;
 
   return (
@@ -73,11 +88,8 @@ export default function EmployeeAttendancePage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-3"><Briefcase size={28} className="text-brand-orange"/> Employee Logs</h1>
-          <p className="text-muted-foreground text-sm mt-1">Showing {filtered.length} total records</p>
+          <p className="text-muted-foreground text-sm mt-1">Official Schedule: 8:00 AM - 6:00 PM (Mon-Sat)</p>
         </div>
-        <Button variant="outline" onClick={exportCSV} className="gap-2 border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white transition-colors">
-          <Download size={16} /> Export to CSV
-        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -97,36 +109,35 @@ export default function EmployeeAttendancePage() {
             <thead>
               <tr className="border-b border-border bg-slate-50">
                 <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Date</th>
-                <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Emp ID</th>
                 <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Name</th>
                 <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Time In</th>
                 <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Time Out</th>
                 <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Hours</th>
-                <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Status</th>
+                <th className="text-left py-4 px-6 font-semibold text-slate-600 uppercase tracking-wider text-xs">Punctuality</th>
               </tr>
             </thead>
             <tbody>
               {paginatedData.map(record => {
                 const emp = employees.find(e => e.id === record.employeeId);
+                const punctuality = checkScheduleStatus(record.timeIn, record.timeOut);
+                
                 return (
                   <tr key={record.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-6 font-medium text-slate-600">{record.date}</td>
-                    <td className="py-3 px-6 font-mono text-xs font-bold text-brand-orange">{emp?.employeeId}</td>
                     <td className="py-3 px-6 font-semibold text-slate-800">{emp?.fullName || 'Unknown'}</td>
                     <td className="py-3 px-6 text-slate-600">{record.timeIn || '—'}</td>
                     <td className="py-3 px-6 text-slate-600">{record.timeOut || '—'}</td>
                     <td className="py-3 px-6 font-medium text-slate-700">{calcHours(record.timeIn, record.timeOut)}</td>
                     <td className="py-3 px-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${record.timeOut ? 'bg-success/15 text-success border border-success/20' : 'bg-warning/15 text-warning border border-warning/20'}`}>
-                        {record.timeOut ? 'Completed' : 'Clocked In'}
-                      </span>
+                      {punctuality && (
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${punctuality.color}`}>
+                          {punctuality.text}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
               })}
-              {paginatedData.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-16 text-muted-foreground"><CalendarCheck size={40} className="mb-3 opacity-20" /><p>No attendance records found</p></td></tr>
-              )}
             </tbody>
           </table>
         </div>

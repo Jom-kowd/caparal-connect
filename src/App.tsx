@@ -9,24 +9,28 @@ import { isAuthenticated } from "./lib/authService";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import QrScan from "./pages/QrScan";
+import NotFound from "./pages/NotFound";
+
 import Interns from "./pages/Interns";
 import Attendance from "./pages/Attendance";
-import QrScan from "./pages/QrScan";
 import IdCards from "./pages/IdCards";
 import InternProfile from "./pages/InternProfile";
+
 import Employees from "./pages/Employees";
 import EmployeeAttendance from "./pages/EmployeeAttendance";
 import EmployeeIdCards from "./pages/EmployeeIdCards";
-import NotFound from "./pages/NotFound";
 import EmployeeProfile from "./pages/EmployeeProfile";
 
+import Leaves from "./pages/Leaves";
+
+import AdminProfile from "./pages/AdminProfile";
 import AdminInternProfile from "./pages/AdminInternProfile";
 import AdminEmployeeProfile from "./pages/AdminEmployeeProfile";
 
-import AdminProfile from "./pages/AdminProfile";
 const queryClient = new QueryClient();
 
-// Protected Route Component (Para sa mga Admin pages)
+// Protected Route Component (Para sa mga Admin/Staff pages)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -41,13 +45,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* 🟢 PUBLIC ROUTES (Kahit walang login, pwede makita) */}
+          {/* 🟢 PUBLIC ROUTES (Kahit walang login, pwede makita ng mag-i-scan) */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/intern/:id" element={<InternProfile />} />
-          <Route path="/employee/:id" element={<EmployeeProfile />} /> {/* <-- Idinagdag na linya */}
+          <Route path="/employee/:id" element={<EmployeeProfile />} />
           
-          {/* 🔴 ADMIN PROTECTED ROUTES (Kailangan naka-login) */}
+          {/* 🔴 PROTECTED ROUTES (Kailangan naka-login bilang Admin o Staff) */}
           
           {/* Main */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -63,13 +67,16 @@ const App = () => (
           <Route path="/employee-attendance" element={<ProtectedRoute><EmployeeAttendance /></ProtectedRoute>} />
           <Route path="/employee-id-cards" element={<ProtectedRoute><EmployeeIdCards /></ProtectedRoute>} />
           
-          {/* Catch-all (404 Page Not Found) */}
-          <Route path="*" element={<NotFound />} />
-
+          {/* Leave Management */}
+          <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
+          
           {/* Admin Profile Views */}
           <Route path="/admin/intern/:id" element={<ProtectedRoute><AdminInternProfile /></ProtectedRoute>} />
           <Route path="/admin/employee/:id" element={<ProtectedRoute><AdminEmployeeProfile /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AdminProfile /></ProtectedRoute>} />
+
+          {/* Catch-all (404 Page Not Found) */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

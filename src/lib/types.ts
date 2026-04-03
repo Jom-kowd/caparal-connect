@@ -41,3 +41,14 @@ export interface EmployeeAttendanceRecord {
   timeIn: string;
   timeOut: string | null;
 }
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  type: 'Sick' | 'Vacation' | 'Emergency' | 'Unpaid';
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  createdAt: string;
+}
