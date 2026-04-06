@@ -69,18 +69,18 @@ export default function QrScan() {
     return () => { if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop().catch(console.error); };
   }, [scannerActive]);
 
-  // ⚡ THE UNIVERSAL SCAN HANDLER
+  // ⚡ FIXED UNIVERSAL SCAN HANDLER WITH ERROR LOGGING
   const handleScan = async (dbId: string, roleType: 'intern' | 'employee') => {
     if (isProcessing) return;
     try {
       let result, person;
       if (roleType === 'employee') {
         person = await getEmployeeById(dbId);
-        if (!person) throw new Error('Employee not found');
+        if (!person) throw new Error('Employee not found in Database.');
         result = await scanEmployeeMutation.mutateAsync(person.id);
       } else {
         person = await getInternById(dbId);
-        if (!person) throw new Error('Intern not found');
+        if (!person) throw new Error('Intern not found in Database.');
         result = await scanInternMutation.mutateAsync(person.id);
       }
       
@@ -96,12 +96,13 @@ export default function QrScan() {
         role: roleType === 'employee' ? 'Employee' : 'Intern'
       });
       toast.success(`${person.fullName} (${roleType === 'employee' ? 'Employee' : 'Intern'}) — ${actionText}`);
-    } catch (error) {
-      toast.error('Invalid QR Code or Record not found.');
+    } catch (error: any) {
+      console.error("SCAN ERROR:", error);
+      // Ipapalabas na natin ang eksaktong error message mula sa Supabase!
+      toast.error(error.message || 'Invalid QR Code or Record not found.');
     }
   };
 
-  // ⚡ SMART MANUAL SUBMIT (Auto-detects EMP- or CAP-)
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualId || isProcessing) return;
