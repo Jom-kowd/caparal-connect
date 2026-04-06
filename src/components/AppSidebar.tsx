@@ -65,7 +65,15 @@ export default function AppSidebar() {
         <Link to="/profile" className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           {user?.photo ? <img src={user.photo} className="w-10 h-10 rounded-full object-cover border border-slate-200" /> : <UserCircle size={40} className="text-slate-400" />}
           <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{user?.fullName || 'User'}</p>
+            <p
+              className={`text-sm font-bold truncate ${
+                user?.role === 'Admin'
+                  ? 'text-orange-500'
+                  : 'text-slate-800 dark:text-slate-200'
+              }`}
+            >
+              {user?.fullName || 'User'}
+            </p>
             <p className={`text-[10px] font-black uppercase tracking-widest ${user?.role === 'Admin' ? 'text-brand-orange' : 'text-blue-500'}`}>{user?.role}</p>
           </div>
           <Settings size={16} className="text-slate-400" />
